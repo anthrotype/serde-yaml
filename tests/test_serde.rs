@@ -547,3 +547,48 @@ fn test_long_string() {
 
     test_serde(&thing, yaml);
 }
+
+#[test]
+fn test_map_as_key_to_another_map() {
+    // Trying to use a BTreeMap as the key for an other BTreeMap. If the map only
+    // contains one item, a strange error is returned by the libyaml emitter:
+    // "expected SCALAR, SEQUENCE-START, MAPPING-START, or ALIAS". If it contains
+    // more than one item, then serialization completes without errors.
+
+    use std::collections::BTreeMap;
+    use std::path::PathBuf;
+
+    #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+    struct Glyph {
+        name: String,
+        sources: BTreeMap<BTreeMap<String, i32>, PathBuf>,
+    }
+
+    let yaml = indoc! {"\
+        name: foo
+        sources:
+          ? Weight: 400
+          : Font-Regular.ufo/glyphs/foo.glif
+    "};
+
+    let glyph = Glyph {
+        name: "foo".to_string(),
+        sources: vec![
+            (
+                BTreeMap::from([("Weight".to_string(), 400)]),
+                PathBuf::from("Font-Regular.ufo/glyphs/foo.glif"),
+            ),
+            // // After uncommenting below, it no longer returns an error
+            // (
+            //     BTreeMap::from([("Weight".to_string(), 700)]),
+            //     PathBuf::from("Font-Bold.ufo/glyphs/foo.glif"),
+            // ),
+        ]
+        .into_iter()
+        .collect(),
+    };
+
+    println!("{:?}", glyph);
+
+    test_serde(&glyph, yaml);
+}
